@@ -1,0 +1,107 @@
+---
+title: "Practical_ML_Assignment"
+author: "Aman Jha"
+date: "1/11/2020"
+output: html_document
+---
+
+The libraries used are as follows:- 
+```{r result=FALSE}
+library(dplyr)
+library(caret)
+library(randomForest)
+library(rpart.plot)
+```
+
+## Summary
+<p>
+Here we are trying to classify whether a subject is performing an exercise correctly.We take a dumbell curl dataset and try to predict all properties required to perform such an exercise correctly.This data is provided through band-type devices.The class we are going to predict here are **classe**
+</p>
+
+<p>
+The classes are :- **A(the correct way )** and **B,C,D,E(incorrect ones)**
+</p>
+
+## Reading and preprocessing 
+<p>Here we are using the **pml-training.csv** and **pml-testing.csv**.This can be downloaded from:-</p>
+<p>https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv</p>
+<p>https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv</p>
+
+```{r}
+set.seed(34234)
+training<- read.csv("pml-training.csv")
+testing<- read.csv("pml-testing.csv")
+```
+
+<p>As we are just using the readings from the accelerometer  on the belt, forearm, arm, and dumbell of 6 participants, we can eliminate the following variables:- </p>
+### Removing variables with more 95% data as NA
+
+```{r cars}
+index<- which((colSums(is.na(training))/nrow(training)<0.95)==TRUE)
+clean_training_data<- training[,index]
+clean_testing_data<- testing[,index]
+```
+### Removing columns which are not required 
+<p>
+The dataset we need requires only selected variables thus we can remove columns involving kurtosis,skweness,amplitude etc.
+</p>
+
+```{r}
+cols<- c("^kurtosis","^skewness","^max","^min","^amplitude")
+fake_index<- grep(paste(cols,collapse="|"),names(clean_training_data),value=FALSE)
+clean_training_data<- clean_training_data[,-fake_index]
+clean_testing_data<- clean_testing_data[,-fake_index]
+
+```
+<p>
+We also remove the first 7 variables as they have no relation with the **classe** variable.
+</p>
+```{r}
+clean_training_data<- clean_training_data[,-(1:7)]
+clean_testing_data<- clean_testing_data[,-(1:7)]
+```
+
+## Creating training & test sets (Cross Validation )
+
+<p>Assembling 75% of the data for trainingand rest for testing.We also set up a cross validation control for the given training models discussed below.</p>
+```{r}
+inTrain<- createDataPartition(clean_training_data$classe,p=0.75,list=FALSE)
+trainset<-clean_training_data[inTrain,]
+testset<-clean_training_data[-inTrain,]
+control<- trainControl(method="repeatedcv",number =10,repeats = 3)
+```
+
+## Setting up models
+
+### MODEL 1:- Decision Trees
+
+<p>We fit a tree in the above training set and match it with the validation test set</p>
+```{r cache=TRUE}
+fit1<- train(classe~.,trainset,method="rpart",trControl=control)
+pred1<- predict(fit1,testset)
+confusionMatrix(pred1,testset$classe)
+```
+<p>We can say that the accuracy is 49.86,fitting the plot we have:- </p>
+```{r}
+rpart.plot(fit1$finalModel)
+```
+<p></p>
+### MODEL 2:- Random Forests
+<p>We check for random forests here .</p>
+```{r cache=TRUE}
+fit2<- randomForest(classe~.,data = trainset)
+pred2<- predict(fit2,testset)
+rf_matrix<- confusionMatrix(pred2,testset$classe)
+rf_matrix
+```
+<p>We can see the accuracy is 99% which makes rf the clear choice.</p>
+```{r}
+plot(rf_matrix$table,main=paste("Accuracy for Random forests is :- ", round(rf_matrix$overall[[1]],4)))
+```
+<p></p>
+## Conclusion 
+<p>We see that **Random forest model** is almost perfect for this dataset. </p>
+<p>THus predicting the testing data we have:- </p>
+```{r}
+predict(fit2,newdata=testing)
+```
